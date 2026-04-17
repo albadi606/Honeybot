@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Firewall Control | CyberSentinel</title>
+    <style>
+        :root {
+            --green: #00ff41;
+            --red: #ff3131;
+            --orange: #ff6b00;
+            --yellow: #ffbd2e;
+            --bg: #0a0a0f;
+            --card: rgba(10,10,15,0.85);
+            --border: rgba(0,255,65,0.15);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            background: var(--bg); color: var(--green);
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            padding: 30px;
+        }
+        body::before {
+            content:''; position:fixed; inset:0;
+            background-image:
+                linear-gradient(rgba(0,255,65,0.015) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,65,0.015) 1px, transparent 1px);
+            background-size: 40px 40px;
+            pointer-events:none; z-index:0;
+        }
+        .wrap { position:relative; z-index:5; max-width: 1200px; margin:0 auto; }
+        h1 { font-size: 18px; letter-spacing: 3px; margin-bottom: 8px; }
+        .subtitle { font-size: 11px; color:#666; margin-bottom: 25px; letter-spacing: 1px; }
+        .flags {
+            display:flex; gap:12px; margin-bottom: 20px; flex-wrap:wrap;
+        }
+        .flag {
+            padding: 6px 12px; font-size: 10px; letter-spacing: 1px;
+            border: 1px solid var(--border);
+        }
+        .flag.on  { color: var(--green); border-color: var(--green); }
+        .flag.off { color: #555; }
+        .flag.warn { color: var(--orange); border-color: var(--orange); }
+
+        .stats {
+            display:grid; grid-template-columns: repeat(3, 1fr);
+            gap: 12px; margin-bottom: 25px;
+        }
+        .stat {
+            background: var(--card); border: 1px solid var(--border);
+            padding: 18px; text-align:center;
+        }
+        .stat .n { font-size: 28px; font-weight: bold; }
+        .stat .l { font-size: 10px; color:#666; letter-spacing: 2px; margin-top: 4px; }
+        .stat.red .n { color: var(--red); }
+        .stat.orange .n { color: var(--orange); }
+
+        .panel {
+            background: var(--card); border: 1px solid var(--border);
+            margin-bottom: 20px;
+        }
+        .panel-head {
+            padding: 14px 20px; border-bottom: 1px solid var(--border);
+            font-size: 11px; letter-spacing: 2px; color: #888;
+            display:flex; justify-content:space-between; align-items:center;
+        }
+        table { width:100%; border-collapse: collapse; font-size: 12px; }
+        th {
+            padding: 10px 15px; text-align:left; font-size: 10px;
+            letter-spacing: 1.5px; color: var(--green);
+            background: rgba(0,255,65,0.05);
+        }
+        td {
+            padding: 10px 15px; border-bottom: 1px solid rgba(255,255,255,0.03);
+        }
+        tr:hover td { background: rgba(0,255,65,0.03); }
+        .perma { color: var(--red); font-weight:bold; }
+        .temp  { color: var(--yellow); }
+        .expired { color: #555; }
+        .btn {
+            padding: 6px 12px; border: 1px solid var(--border);
+            background: transparent; color: var(--green);
+            font-family: inherit; font-size: 10px; letter-spacing: 1px;
+            cursor:pointer; text-transform: uppercase;
+            transition: all .2s;
+        }
+        .btn:hover { background: rgba(0,255,65,0.1); }
+        .btn.danger { color: var(--red); border-color: rgba(255,49,49,0.3); }
+        .btn.danger:hover { background: rgba(255,49,49,0.1); border-color: var(--red); }
+
+        .manual-form {
+            padding: 18px 20px;
+            display: grid; grid-template-columns: 2fr 3fr 1fr 1fr auto;
+            gap: 10px; align-items:center;
+        }
+        .manual-form input[type=text], .manual-form input[type=number] {
+            background: rgba(0,0,0,0.5); border:1px solid var(--border);
+            color: var(--green); padding: 8px 10px;
+            font-family: inherit; font-size: 12px;
+        }
+        .manual-form label { font-size: 10px; color:#666; }
+        .empty { padding: 30px; text-align:center; color:#333; font-size: 12px; letter-spacing: 1px; }
+
+        .nav { margin-bottom: 25px; display:flex; gap: 12px; }
+        .nav a {
+            color: #555; text-decoration:none;
+            font-size: 11px; letter-spacing: 2px;
+            padding: 6px 12px; border: 1px solid transparent;
+            transition: all .2s;
+        }
+        .nav a:hover { color: var(--green); border-color: var(--border); }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="nav">
+        <a href="/dashboard/">&lt; DASHBOARD</a>
+        <a href="/export-iocs/">&gt; EXPORT IOCs (JSON)</a>
+        <a href="/admin/">&gt; DJANGO ADMIN</a>
+    </div>
+
+    <h1>// FIREWALL CONTROL</h1>
+    <p class="subtitle">Adaptive block engine — detect → decide → respond</p>
+
+    <div class="flags">
+        <span class="flag on">FIREWALL: ENABLED</span>
+        {% if observe_only %}
+          <span class="flag warn">MODE: OBSERVE-ONLY (no block)</span>
+        {% else %}
+          <span class="flag on">MODE: ENFORCE</span>
+        {% endif %}
+        {% if os_integration %}
+          <span class="flag on">OS INTEGRATION: iptables/netsh</span>
+        {% else %}
+          <span class="flag off">OS INTEGRATION: OFF</span>
+        {% endif %}
+    </div>
+
+    <div class="stats">
+        <div class="stat red"><div class="n">{{ total_active }}</div><div class="l">ACTIVE BLOCKS</div></div>
+        <div class="stat orange"><div class="n">{{ expired_blocks|length }}</div><div class="l">EXPIRED</div></div>
+        <div class="stat"><div class="n">{{ total_ever }}</div><div class="l">TOTAL EVER</div></div>
+    </div>
+
+    <!-- Manual block form -->
+    <div class="panel">
+        <div class="panel-head">// MANUAL BLOCK</div>
+        <form class="manual-form" method="POST" action="/firewall/block/">
+            {% csrf_token %}
+            <input type="text" name="ip" placeholder="IP address" required>
+            <input type="text" name="reason" placeholder="Reason" value="Manual block">
+            <input type="number" name="duration" placeholder="seconds" value="3600">
+            <label><input type="checkbox" name="permanent"> Permanent</label>
+            <button type="submit" class="btn">BLOCK</button>
+        </form>
+    </div>
+
+    <!-- Active blocks -->
+    <div class="panel">
+        <div class="panel-head">
+            // ACTIVE BLOCKS
+            <span style="font-size:9px; color:#444;">{{ total_active }} entries</span>
+        </div>
+        {% if active_blocks %}
+        <table>
+            <thead>
+                <tr>
+                    <th>IP</th><th>REASON</th><th>SEV</th>
+                    <th>HITS</th><th>BLOCKS</th><th>EXPIRES</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in active_blocks %}
+                <tr>
+                    <td>{{ b.ip_address }}</td>
+                    <td>{{ b.reason }}</td>
+                    <td>{{ b.severity }}</td>
+                    <td>{{ b.hits }}</td>
+                    <td>{{ b.block_count }}</td>
+                    <td>
+                        {% if b.permanent %}
+                            <span class="perma">PERMANENT</span>
+                        {% else %}
+                            <span class="temp">{{ b.expires_at|date:"Y-m-d H:i" }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button class="btn danger" onclick="unblock('{{ b.ip_address }}')">UNBLOCK</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">NO ACTIVE BLOCKS</div>
+        {% endif %}
+    </div>
+
+    <!-- Expired -->
+    <div class="panel">
+        <div class="panel-head">// EXPIRED (still logged for history)</div>
+        {% if expired_blocks %}
+        <table>
+            <thead>
+                <tr><th>IP</th><th>REASON</th><th>SEV</th><th>BLOCKS</th><th>EXPIRED AT</th></tr>
+            </thead>
+            <tbody>
+                {% for b in expired_blocks %}
+                <tr class="expired">
+                    <td>{{ b.ip_address }}</td>
+                    <td>{{ b.reason }}</td>
+                    <td>{{ b.severity }}</td>
+                    <td>{{ b.block_count }}</td>
+                    <td>{{ b.expires_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">NO EXPIRED ENTRIES</div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function getCookie(name) {
+    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return m ? m[2] : '';
+}
+function unblock(ip) {
+    if (!confirm('Unblock ' + ip + '?')) return;
+    const fd = new FormData();
+    fd.append('ip', ip);
+    fetch('/firewall/unblock/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: fd,
+    })
+    .then(r => r.json())
+    .then(d => { if (d.ok) location.reload(); else alert('failed'); })
+    .catch(() => alert('network error'));
+}
+</script>
+</body>
+</html>

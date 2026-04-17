@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberSentinel | Secure Access Portal</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0a0f;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Matrix rain canvas */
+        #matrix-bg {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+            opacity: 0.15;
+        }
+
+        /* Scanline overlay */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15) 0px,
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .container {
+            position: relative;
+            z-index: 5;
+            background: rgba(10, 10, 15, 0.85);
+            backdrop-filter: blur(20px);
+            padding: 50px 60px;
+            border: 1px solid rgba(0, 255, 65, 0.3);
+            border-radius: 4px;
+            text-align: center;
+            max-width: 460px;
+            width: 90%;
+            box-shadow:
+                0 0 40px rgba(0, 255, 65, 0.1),
+                inset 0 0 60px rgba(0, 255, 65, 0.02);
+            animation: fadeInUp 0.8s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo {
+            font-size: 14px;
+            letter-spacing: 6px;
+            color: #00ff41;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            text-shadow: 0 0 20px rgba(0, 255, 65, 0.5);
+        }
+
+        h1 {
+            font-size: 22px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+        }
+
+        .subtitle {
+            font-size: 11px;
+            color: #ff3131;
+            letter-spacing: 2px;
+            margin-bottom: 35px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #00ff41, transparent);
+            margin: 20px 0;
+        }
+
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            margin: 16px 0;
+            background: transparent;
+            border: 1px solid rgba(0, 255, 65, 0.4);
+            color: #00ff41;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            font-size: 13px;
+            font-family: inherit;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 255, 65, 0.15), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before { left: 100%; }
+
+        .btn:hover {
+            background: rgba(0, 255, 65, 0.1);
+            border-color: #00ff41;
+            box-shadow: 0 0 25px rgba(0, 255, 65, 0.2), inset 0 0 25px rgba(0, 255, 65, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .btn:active { transform: translateY(0); }
+
+        .btn-admin {
+            border-color: rgba(255, 49, 49, 0.4);
+            color: #ff3131;
+        }
+        .btn-admin:hover {
+            background: rgba(255, 49, 49, 0.1);
+            border-color: #ff3131;
+            box-shadow: 0 0 25px rgba(255, 49, 49, 0.2), inset 0 0 25px rgba(255, 49, 49, 0.05);
+        }
+        .btn-admin::before {
+            background: linear-gradient(90deg, transparent, rgba(255, 49, 49, 0.15), transparent);
+        }
+
+        .status {
+            margin-top: 30px;
+            font-size: 10px;
+            color: #444;
+            letter-spacing: 1px;
+        }
+
+        .status-dot {
+            display: inline-block;
+            width: 6px; height: 6px;
+            background: #00ff41;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.2; }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="matrix-bg"></canvas>
+
+    <div class="container">
+        <div class="logo">&#9671; CyberSentinel &#9671;</div>
+        <h1>// SECURE_ACCESS_PORTAL</h1>
+        <div class="subtitle">CAUTION: ALL ACCESS IS MONITORED AND LOGGED</div>
+
+        <div class="divider"></div>
+
+        <a href="/login/" class="btn">&gt; User_Authentication</a>
+        <a href="/admin/" class="btn btn-admin">&gt; Admin_Management</a>
+
+        <div class="status">
+            <span class="status-dot"></span>
+            SYSTEM ACTIVE &mdash; FORENSIC MONITORING ENABLED
+        </div>
+    </div>
+
+    <script>
+        // Matrix rain effect
+        const canvas = document.getElementById('matrix-bg');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()';
+        const fontSize = 14;
+        const columns = Math.floor(canvas.width / fontSize);
+        const drops = Array(columns).fill(1);
+
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(10, 10, 15, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#00ff41';
+            ctx.font = fontSize + 'px monospace';
+
+            for (let i = 0; i < drops.length; i++) {
+                const text = chars[Math.floor(Math.random() * chars.length)];
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+
+        setInterval(drawMatrix, 50);
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>

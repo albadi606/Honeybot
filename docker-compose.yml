@@ -1,0 +1,17 @@
+services:
+  web:
+    build: .
+    volumes:
+      - .:/app
+      - db_data:/app/honeypot_project/db
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=0
+      - ALLOWED_HOSTS=*
+      - ANALYST_NAME=CyberSentinel Analyst
+      - DJANGO_COLLECTSTATIC=1
+    restart: always
+
+volumes:
+  db_data:

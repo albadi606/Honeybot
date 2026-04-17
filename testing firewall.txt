@@ -1,0 +1,88 @@
+ in another terminal sign in 
+USE_X_FORWARDED_FOR=1 && python manage.py runserver
+
+
+— fake_attacker.py 
+
+  # Terminal 1: start server with XFF trust ON                                                                                                                 set USE_X_FORWARDED_FOR=1
+  python manage.py runserver                                                                                                                                 
+  # Terminal 2: fire attacks from fake IPs
+  python fake_attacker.py --ip 203.0.113.45 --attack sqli
+  python fake_attacker.py --ip 198.51.100.22 --attack brute
+  python fake_attacker.py --ip 45.33.32.156 --attack all
+
+  After ~3 hits the firewall auto-blocks that IP. Check /firewall/ to see it blocked.
+
+  ---
+curl with spoofed IP header
+
+this is a cmd attack 
+ Those are curl commands — command-line HTTP requests. Think of curl as a browser that doesn't render HTML, just sends raw HTTP.
+
+  First command — single attack:                                                                                                                               curl -X POST http://127.0.0.1:8000/login/
+  Sends a POST to the login page (same as submitting the login form)                                                                                         
+  -H "X-Forwarded-For: 203.0.113.45"
+  Adds a fake "I'm coming from this IP" header
+
+  --data "username=admin' OR 1=1 --&password=x"
+  Submits SQL injection as the username field
+
+  Result → honeypot logs it as 203.0.113.45 doing SQL injection → auto-blocked.
+
+  ---
+  Second command — flood test:
+  for i in $(seq 1 70)
+  Loops 70 times
+
+  Sends 70 rapid requests from fake IP 198.51.100.77 → rate limiter kicks in at 60 req/10s → that IP gets blocked for 15 min.
+
+
+
+  # Single shot — spoofed IP 203.0.113.45
+  curl -X POST http://127.0.0.1:8000/login/ \
+    -H "X-Forwarded-For: 203.0.113.45" \
+    -H "X-Real-IP: 203.0.113.45" \
+    --data "username=admin' OR 1=1 --&password=x"
+
+  # Flood test — triggers rate limiter (60 req/10s threshold)
+  for i in $(seq 1 70); do
+    curl -s -X POST http://127.0.0.1:8000/login/ \
+      -H "X-Forwarded-For: 198.51.100.77" \
+      --data "username=test&password=test" > /dev/null
+  done
+
+  ---------------------------------===========================================================
+Test manual block via dashboard
+
+  Go to /firewall/ → enter any IP → click Block. Then try accessing /login/ with that IP via curl — should get 403.
+
+  ---
+  Verify firewall is working
+
+  # Check blocked IPs in DB
+  python manage.py shell -c "
+  from detector.models import BlockedIP
+  for b in BlockedIP.objects.all():
+      print(b.ip_address, b.reason, b.permanent)
+
+----------------------------------------
+
+for testing if the firewall have blocked u 
+
+ http://127.0.0.1:8000/login/
+
+  That's the honeypot bait login page. Submit any credentials → logs captured in dashboard under 127.0.0.1.
+                                                                                                                                                               ---
+  For presentation demo — show blocking with fake IP:                                                                                                        
+  Run server with XFF on in one terminal:
+  set USE_X_FORWARDED_FOR=1 && python manage.py runserver
+
+  Open dashboard in browser:
+  http://127.0.0.1:8000/dashboard/
+
+  Fire attack in second terminal:
+  python fake_attacker.py --ip 203.0.113.45 --attack sqli
+
+  → Dashboard shows 203.0.113.45 getting logged → /firewall/ shows it blocked.
+
+  Your own browser at 127.0.0.1 stays unaffected — whitelisted, never blocked.

